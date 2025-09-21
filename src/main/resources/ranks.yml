@@ -1,0 +1,103 @@
+# ===========================================
+# RankCorex - Ranks Configuration
+# ===========================================
+# Define all ranks here.
+# Each rank has:
+#   prefix     → Appears before player name.
+#   suffix     → Appears after player name.
+#   weight     → Higher = more priority (used for sorting, inheritance later).
+#   default    → Only one rank can be "true". Assigned if no other rank.
+#   permissions → List of permission nodes this rank has.
+#
+# Permission Examples:
+#   essentials.fly          → Specific permission
+#   essentials.*            → All essentials permissions
+#   -*                      → Remove all permissions (use carefully!)
+#   -essentials.ban         → Remove specific permission
+#   *                       → ALL permissions (admin only!)
+#
+# Permission Priority:
+#   Negative permissions (-permission) override positive ones
+#   More specific permissions override wildcards
+# ===========================================
+
+ranks:
+  default:
+    prefix: "&7[Default] "
+    suffix: ""
+    weight: 1
+    default: true
+    permissions:
+      # Basic permissions every player should have
+      - "chatcorex.chat"
+      - "chatcorex.color"
+      - "minecraft.command.list"
+      - "minecraft.command.me"
+
+  vip:
+    prefix: "&a[VIP] "
+    suffix: " &a♦"
+    weight: 10
+    default: false
+    permissions:
+      # Inherit default permissions (will be automatic in future versions)
+      - "chatcorex.chat"
+      - "chatcorex.color"
+      - "minecraft.command.list"
+      - "minecraft.command.me"
+      # VIP specific permissions
+      - "essentials.kit.vip"
+      - "essentials.fly"
+      - "essentials.speed"
+      - "chatcorex.mention.sound"
+      - "minecraft.command.time.query"
+
+  moderator:
+    prefix: "&9[Mod] "
+    suffix: " &9★"
+    weight: 30
+    default: false
+    permissions:
+      # Basic player permissions
+      - "chatcorex.*"
+      - "minecraft.command.*"
+      # Moderation permissions
+      - "essentials.kick"
+      - "essentials.mute"
+      - "essentials.tempban"
+      - "essentials.jail"
+      - "essentials.warp"
+      - "essentials.fly"
+      - "essentials.god"
+      - "essentials.vanish"
+      - "essentials.socialspy"
+      # Remove some admin permissions they shouldn't have
+      - "-essentials.ban"
+      - "-essentials.unban"
+      - "-minecraft.command.op"
+
+  admin:
+    prefix: "&c[Admin] "
+    suffix: " &c✦"
+    weight: 50
+    default: false
+    permissions:
+      # Almost all permissions
+      - "essentials.*"
+      - "minecraft.*"
+      - "chatcorex.*"
+      - "worldedit.*"
+      - "worldguard.*"
+      # But remove some dangerous ones
+      - "-minecraft.command.stop"
+      - "-minecraft.command.op"
+      - "-minecraft.command.deop"
+
+  owner:
+    prefix: "&4[Owner] "
+    suffix: " &4★"
+    weight: 100
+    default: false
+    permissions:
+      # Everything - use with caution!
+      - "*"

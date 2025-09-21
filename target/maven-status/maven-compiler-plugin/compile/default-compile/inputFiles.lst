@@ -1,0 +1,17 @@
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\commands\RankCommand.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\commands\subcommands\RankCheckCommand.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\commands\subcommands\RankListCommand.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\commands\subcommands\RankReloadCommand.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\commands\subcommands\RankRemoveCommand.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\commands\subcommands\RankSetCommand.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\listeners\JoinListener.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\managers\PlaceholderHook.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\managers\RankManager.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\managers\StorageManager.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\managers\SyncManager.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\models\PlayerRankData.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\models\RankData.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\placeholder\RankExpansion.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\Rankcorex.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\utils\MessageUtils.java
+C:\Users\abdel\Plugins development\rankcorex\src\main\java\dev\abdelrahman\rankcorex\utils\TimeUtils.java

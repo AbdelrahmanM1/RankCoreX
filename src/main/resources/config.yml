@@ -1,0 +1,51 @@
+# ===========================================
+# RankCorex - Main Configuration
+# ===========================================
+# This file controls storage, debugging, syncing, and nametag features.
+# ===========================================
+
+# -----------------------------
+# Storage Settings
+# -----------------------------
+storage:
+  # Options:
+  #   yaml  → (default) stores data locally in files (single server use).
+  #   mysql → store & sync data across multiple servers (recommended for networks).
+  type: yaml
+
+  mysql:
+    host: localhost
+    port: 3306
+    database: rankcorex
+    username: root
+    password: password
+    # ⚠️ IMPORTANT: Make sure your MySQL database is created and accessible.
+    # Use MySQL if you want global-sync enabled across servers.
+
+# -----------------------------
+# Debug Settings
+# -----------------------------
+# Enable detailed debug logging for developers.
+# Only enable if you’re troubleshooting issues.
+debug: false
+
+# -----------------------------
+# Global Sync (Bungee/Velocity)
+# -----------------------------
+# If true → requires MySQL storage type.
+# Ensures ranks & permissions are synced across all servers in the network.
+global-sync: false
+
+sync:
+  # Plugin messaging channel for updates across servers
+  channel: "rankcorex:sync"
+
+  # If true, logs every sync event in console
+  notify: true
+
+# -----------------------------
+# Nametag & Tablist
+# -----------------------------
+nametag:
+  enabled: true   # Enable/disable nametags above players
+  tablist: true   # Enable/disable prefixes/suffixes in tablist

@@ -1,0 +1,53 @@
+# ===========================================
+# RankCorex - plugin.yml
+# ===========================================
+
+name: RankCorex
+version: '1.0'
+main: dev.abdelrahman.rankcorex.Rankcorex
+api-version: '1.13'
+authors: [3bdoabk]
+description: >
+  RankCorex is a lightweight yet powerful rank & permissions 
+  management plugin for Minecraft servers and networks. 
+  Features YAML & MySQL storage, temporary ranks, 
+  cross-server sync, nametags, tablist customization, 
+  and PlaceholderAPI integration.
+
+softdepend:
+  - PlaceholderAPI
+commands:
+  rank:
+    description: Main RankCorex command.
+    usage: /rank <set|remove|check|list|reload>
+    permission: rankcorex.admin
+
+permissions:
+  # Core Admin Node
+  rankcorex.admin:
+    description: Access to all admin commands (/rank set, remove, reload).
+    default: op
+
+  # Individual Command Permissions
+  rankcorex.set:
+    description: Assign temporary or permanent ranks.
+    default: op
+
+  rankcorex.remove:
+    description: Remove a player's rank.
+    default: op
+
+  rankcorex.check:
+    description: Check a player's current rank(s).
+    default: true
+
+  rankcorex.list:
+    description: List all available ranks.
+    default: true
+
+  rankcorex.reload:
+    description: Reload RankCorex configurations.
+    default: op
+  rankcorex.bypass:
+    description: Bypass rank hierarchy restrictions
+    default: false
