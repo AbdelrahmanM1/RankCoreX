@@ -36,6 +36,11 @@ public class RankManager {
 
     private RankData defaultRank;
 
+    // Version detection for universal compatibility
+    private String mcVersion;
+    private boolean isOldMinecraft;
+    private boolean isVeryOldMinecraft;
+
     // Constants for validation
     private static final String PERMISSION_PATTERN = "^[a-zA-Z0-9._*-]+$";
     private static final int MAX_PREFIX_LENGTH = 16;
@@ -44,6 +49,16 @@ public class RankManager {
 
     public RankManager(Rankcorex plugin) {
         this.plugin = plugin;
+
+        // Detect Minecraft version for compatibility
+        this.mcVersion = Bukkit.getBukkitVersion();
+        this.isOldMinecraft = mcVersion.contains("1.8") || mcVersion.contains("1.9") ||
+                mcVersion.contains("1.10") || mcVersion.contains("1.11") || mcVersion.contains("1.12");
+        this.isVeryOldMinecraft = mcVersion.contains("1.8") || mcVersion.contains("1.7");
+
+        plugin.log("Running on Minecraft " + mcVersion +
+                (isOldMinecraft ? " (OLD VERSION)" : " (NEW VERSION)") +
+                (isVeryOldMinecraft ? " - Using compatibility mode" : ""));
     }
 
     public void loadRanks() {
@@ -241,7 +256,7 @@ public class RankManager {
     }
 
     /**
-     * Enhanced player rank loading with better error handling
+     * player rank loading with better error handling
      */
     public void loadPlayerRank(Player player) {
         if (player == null) {
@@ -400,7 +415,7 @@ public class RankManager {
     }
 
     /**
-     * Enhanced rank application with nametag and tablist support
+     *  rank application with nametag and tablist support
      */
     public void applyPlayerRank(Player player) {
         if (player == null || !player.isOnline()) {
@@ -435,7 +450,7 @@ public class RankManager {
                 return;
             }
 
-            // Apply permissions
+            // Apply permissions with universal compatibility
             if (!applyPermissions(player, rankData)) {
                 plugin.error("Failed to apply permissions for player " + player.getName());
             }
@@ -461,123 +476,269 @@ public class RankManager {
     }
 
     /**
-     *  permission system with comprehensive error handling
+     * UNIVERSAL PERMISSION SYSTEM - Works with all Minecraft versions
      */
     private boolean applyPermissions(Player player, RankData rankData) {
         UUID playerId = player.getUniqueId();
+        plugin.debug("Applying permissions to " + player.getName() + " (MC: " + mcVersion + ")");
 
         try {
-            // Remove existing attachment safely
-            PermissionAttachment oldAttachment = permissionAttachments.remove(playerId);
-            if (oldAttachment != null) {
-                try {
-                    Set<String> oldPermissions = playerPermissions.get(playerId);
-                    if (oldPermissions != null) {
-                        plugin.debug("Removing " + oldPermissions.size() + " old permissions from " + player.getName());
-                    }
-                    player.removeAttachment(oldAttachment);
-                } catch (Exception e) {
-                    plugin.debug("Error removing old permission attachment: " + e.getMessage());
-                }
+            // Step 1: Clean up old permissions
+            cleanupOldPermissions(player, playerId);
+
+            // Step 2: Verify player is still online
+            if (!player.isOnline()) {
+                plugin.debug("Player " + player.getName() + " went offline, skipping permissions");
+                return false;
             }
-            playerPermissions.remove(playerId);
 
-            // Create new attachment
-            PermissionAttachment attachment = player.addAttachment(plugin);
-            Set<String> currentPermissions = new HashSet<>();
+            // Step 3: Create new permission attachment
+            PermissionAttachment attachment = createPermissionAttachment(player);
+            if (attachment == null) {
+                plugin.error("Failed to create permission attachment for " + player.getName());
+                return false;
+            }
 
-            // Apply permissions
-            List<String> permissions = rankData.getPermissions();
-            int appliedCount = 0;
-            int failedCount = 0;
+            // Step 4: Apply all permissions from the rank
+            Set<String> appliedPermissions = new HashSet<>();
+            List<String> rankPermissions = rankData.getPermissions();
 
-            if (permissions != null && !permissions.isEmpty()) {
-                for (String permission : permissions) {
-                    if (permission == null || permission.trim().isEmpty()) {
-                        continue;
-                    }
-
-                    String perm = permission.trim();
-                    boolean value = true;
-
-                    // Handle negative permissions
-                    if (perm.startsWith("-")) {
-                        value = false;
-                        perm = perm.substring(1).trim();
-                        if (perm.isEmpty()) {
-                            failedCount++;
-                            continue;
-                        }
-                    }
-
-                    try {
-                        // Register permission if it doesn't exist
-                        registerPermissionIfNeeded(perm);
-
-                        // Set permission
-                        attachment.setPermission(perm, value);
-                        currentPermissions.add(perm + ":" + value);
-                        appliedCount++;
-
-                    } catch (Exception e) {
-                        plugin.debug("Failed to apply permission " + perm + " to " + player.getName() + ": " + e.getMessage());
-                        failedCount++;
+            if (rankPermissions != null && !rankPermissions.isEmpty()) {
+                for (String permission : rankPermissions) {
+                    if (addSinglePermission(attachment, permission, player.getName())) {
+                        appliedPermissions.add(permission);
                     }
                 }
             }
 
-            // Store attachment and permissions
+            // Step 5: Store attachment and permissions
             permissionAttachments.put(playerId, attachment);
-            playerPermissions.put(playerId, currentPermissions);
+            playerPermissions.put(playerId, appliedPermissions);
 
-            // Force permission recalculation with retry
-            recalculatePermissionsWithRetry(player);
+            // Step 6: Update player permissions with version-specific timing
+            updatePlayerPermissions(player, rankPermissions);
 
-            plugin.debug("Applied " + appliedCount + " permissions to " + player.getName() +
-                    (failedCount > 0 ? " (failed: " + failedCount + ")" : ""));
+            plugin.debug("Successfully applied " + appliedPermissions.size() + " permissions to " + player.getName());
+            return true;
 
-            return failedCount == 0;
         } catch (Exception e) {
             plugin.error("Critical error applying permissions to " + player.getName() + ": " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
 
     /**
-     * Register permission with bukkit if it doesn't exist
+     * Clean up old permissions safely
      */
-    private void registerPermissionIfNeeded(String perm) {
-        if (!perm.equals("*") && Bukkit.getPluginManager().getPermission(perm) == null) {
+    private void cleanupOldPermissions(Player player, UUID playerId) {
+        PermissionAttachment oldAttachment = permissionAttachments.remove(playerId);
+        if (oldAttachment == null) {
+            return;
+        }
+
+        try {
+            if (isVeryOldMinecraft) {
+                // For very old versions, try different removal methods
+                try {
+                    oldAttachment.remove();
+                    plugin.debug("Removed old attachment using remove() for " + player.getName());
+                } catch (NoSuchMethodError e) {
+                    player.removeAttachment(oldAttachment);
+                    plugin.debug("Removed old attachment using removeAttachment() for " + player.getName());
+                }
+            } else {
+                // For newer versions
+                oldAttachment.remove();
+            }
+        } catch (Exception e) {
+            plugin.debug("Error removing old attachment: " + e.getMessage());
+            // Fallback method
             try {
-                Permission bukkitPerm = new Permission(perm, PermissionDefault.FALSE);
-                Bukkit.getPluginManager().addPermission(bukkitPerm);
-                plugin.debug("Registered new permission: " + perm);
+                player.removeAttachment(oldAttachment);
+            } catch (Exception e2) {
+                plugin.debug("Fallback attachment removal failed: " + e2.getMessage());
+            }
+        }
+
+        playerPermissions.remove(playerId);
+    }
+
+    /**
+     * Create permission attachment with safety checks
+     */
+    private PermissionAttachment createPermissionAttachment(Player player) {
+        try {
+            if (!plugin.isEnabled()) {
+                plugin.error("Plugin is not enabled, cannot create permission attachment");
+                return null;
+            }
+
+            if (!player.isOnline()) {
+                plugin.debug("Player " + player.getName() + " is not online, skipping attachment creation");
+                return null;
+            }
+
+            PermissionAttachment attachment = player.addAttachment(plugin);
+
+            if (attachment == null) {
+                plugin.error("Permission attachment creation returned null for " + player.getName());
+                return null;
+            }
+
+            plugin.debug("Successfully created permission attachment for " + player.getName());
+            return attachment;
+
+        } catch (Exception e) {
+            plugin.error("Exception creating permission attachment for " + player.getName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Add a single permission safely
+     */
+    private boolean addSinglePermission(PermissionAttachment attachment, String permission, String playerName) {
+        if (permission == null || permission.trim().isEmpty()) {
+            return false;
+        }
+
+        String cleanPerm = permission.trim();
+        boolean isPositive = true;
+
+        // Handle negative permissions
+        if (cleanPerm.startsWith("-")) {
+            isPositive = false;
+            cleanPerm = cleanPerm.substring(1).trim();
+            if (cleanPerm.isEmpty()) {
+                return false;
+            }
+        }
+
+        // Validate permission format
+        if (!isValidPermissionString(cleanPerm)) {
+            plugin.debug("Invalid permission string: " + cleanPerm);
+            return false;
+        }
+
+        try {
+            attachment.setPermission(cleanPerm, isPositive);
+            plugin.debug("Added permission " + cleanPerm + " = " + isPositive + " to " + playerName);
+            return true;
+        } catch (Exception e) {
+            plugin.debug("Failed to add permission " + cleanPerm + " to " + playerName + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Validate permission string format
+     */
+    private boolean isValidPermissionString(String permission) {
+        if (permission == null || permission.isEmpty()) {
+            return false;
+        }
+
+        if (permission.contains("..") || permission.startsWith(".") || permission.endsWith(".")) {
+            return false;
+        }
+
+        if (permission.length() > 255) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Update player permissions with version-specific timing
+     */
+    private void updatePlayerPermissions(Player player, List<String> expectedPermissions) {
+        try {
+            // Immediate recalculation
+            player.recalculatePermissions();
+
+            // Delayed recalculation with version-specific timing
+            int delayTicks = isVeryOldMinecraft ? 15 : (isOldMinecraft ? 10 : 5);
+
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) {
+                    try {
+                        player.recalculatePermissions();
+                        plugin.debug("Updated permissions for " + player.getName() + " (delayed)");
+
+                        // Additional validation for old versions
+                        if (isVeryOldMinecraft) {
+                            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                if (player.isOnline()) {
+                                    player.recalculatePermissions();
+                                    validatePermissionsWorking(player, expectedPermissions);
+                                    plugin.debug("Final permission update for " + player.getName());
+                                }
+                            }, 10L);
+                        }
+
+                    } catch (Exception e) {
+                        plugin.debug("Error in delayed permission update: " + e.getMessage());
+                    }
+                }
+            }, delayTicks);
+
+        } catch (Exception e) {
+            plugin.debug("Error updating permissions: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Validate that permissions are actually working
+     */
+    private void validatePermissionsWorking(Player player, List<String> expectedPermissions) {
+        if (expectedPermissions == null || expectedPermissions.isEmpty()) {
+            return;
+        }
+
+        boolean foundWorkingPermission = false;
+
+        for (String perm : expectedPermissions) {
+            if (perm == null || perm.trim().isEmpty() || perm.startsWith("-")) {
+                continue;
+            }
+
+            String cleanPerm = perm.trim();
+            try {
+                boolean hasPermission = player.hasPermission(cleanPerm);
+                plugin.debug("Permission validation - " + player.getName() + " has " + cleanPerm + ": " + hasPermission);
+
+                if (hasPermission) {
+                    foundWorkingPermission = true;
+                    break;
+                }
             } catch (Exception e) {
-                // Permission might already exist, ignore
+                plugin.debug("Error testing permission " + cleanPerm + ": " + e.getMessage());
+            }
+        }
+
+        if (!foundWorkingPermission && !expectedPermissions.isEmpty()) {
+            plugin.debug("Permission validation failed for " + player.getName() + ", attempting recovery...");
+            // Attempt to reapply permissions
+            UUID playerId = player.getUniqueId();
+            PlayerRankData playerData = playerRanks.get(playerId);
+            if (playerData != null) {
+                RankData rankData = getRank(playerData.getRankName());
+                if (rankData != null) {
+                    plugin.debug("Retrying permission application for " + player.getName());
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        if (player.isOnline()) {
+                            applyPermissions(player, rankData);
+                        }
+                    }, 5L);
+                }
             }
         }
     }
 
     /**
-     * Recalculate permissions with retry mechanism
-     */
-    private void recalculatePermissionsWithRetry(Player player) {
-        try {
-            player.recalculatePermissions();
-
-            // Delayed recalculation for better reliability
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (player.isOnline()) {
-                    player.recalculatePermissions();
-                }
-            }, 2L);
-        } catch (Exception e) {
-            plugin.debug("Error recalculating permissions: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Enhanced nametag application with automatic gaps
+     *  nametag application with automatic gaps
      */
     private boolean applyNametag(Player player, RankData rankData) {
         try {
@@ -821,7 +982,7 @@ public class RankManager {
     }
 
     /**
-     * Enhanced player cleanup with tablist reset
+     * UPDATED: Enhanced player cleanup with universal version support
      */
     public void removePlayer(Player player) {
         if (player == null) return;
@@ -830,25 +991,43 @@ public class RankManager {
         ReentrantLock lock = getPlayerLock(playerId);
         lock.lock();
         try {
-            plugin.debug("Removing player data for " + player.getName());
+            plugin.debug("Cleaning up " + player.getName());
 
-            // Remove from caches
+            // Remove from our storage
             playerRanks.remove(playerId);
             playerPermissions.remove(playerId);
 
-            // Remove permission attachment
+            // Remove permission attachment with universal compatibility
             PermissionAttachment attachment = permissionAttachments.remove(playerId);
             if (attachment != null) {
                 try {
-                    player.removeAttachment(attachment);
+                    if (isVeryOldMinecraft) {
+                        // For very old versions, try different removal methods
+                        try {
+                            attachment.remove();
+                            plugin.debug("Removed attachment using remove() for " + player.getName());
+                        } catch (NoSuchMethodError e) {
+                            player.removeAttachment(attachment);
+                            plugin.debug("Removed attachment using removeAttachment() for " + player.getName());
+                        }
+                    } else {
+                        // For newer versions
+                        attachment.remove();
+                    }
                 } catch (Exception e) {
                     plugin.debug("Permission attachment cleanup error: " + e.getMessage());
+                    // Fallback method
+                    try {
+                        player.removeAttachment(attachment);
+                    } catch (Exception e2) {
+                        plugin.debug("Fallback attachment removal failed: " + e2.getMessage());
+                    }
                 }
             }
 
             // Reset tablist name
             try {
-                player.setPlayerListName(player.getName());
+                player.setPlayerListName(null); // Reset to default
             } catch (Exception e) {
                 plugin.debug("Tablist cleanup error: " + e.getMessage());
             }
@@ -856,10 +1035,10 @@ public class RankManager {
             // Clean up scoreboard teams
             cleanupPlayerScoreboard(player);
 
-            plugin.debug("Cleaned up all data for player " + player.getName());
+            plugin.debug("Finished cleaning up " + player.getName());
+
         } finally {
             lock.unlock();
-            // Remove the lock to prevent memory leaks
             playerLocks.remove(playerId);
         }
     }
@@ -967,7 +1146,6 @@ public class RankManager {
      */
     public void processRankExpirations() {
         List<UUID> expiredPlayers = new ArrayList<>();
-        String currentTime = TimeUtils.getCurrentTimestamp();
 
         for (Map.Entry<UUID, PlayerRankData> entry : playerRanks.entrySet()) {
             PlayerRankData data = entry.getValue();
@@ -1013,5 +1191,92 @@ public class RankManager {
         }
 
         return true;
+    }
+
+    /**
+     * NEW: Debug method to help diagnose permission issues
+     */
+    public void debugPlayerPermissions(Player player) {
+        if (player == null) return;
+
+        UUID playerId = player.getUniqueId();
+        PlayerRankData playerData = playerRanks.get(playerId);
+
+        plugin.log("=== Permission Debug for " + player.getName() + " ===");
+        plugin.log("Server Version: " + mcVersion +
+                (isOldMinecraft ? " (OLD)" : " (NEW)") +
+                (isVeryOldMinecraft ? " (VERY OLD)" : ""));
+
+        if (playerData == null) {
+            plugin.log("No rank data found!");
+            return;
+        }
+
+        RankData rank = getRank(playerData.getRankName());
+        if (rank == null) {
+            plugin.log("Invalid rank: " + playerData.getRankName());
+            return;
+        }
+
+        plugin.log("Rank: " + rank.getName());
+        plugin.log("Has attachment: " + (permissionAttachments.get(playerId) != null));
+
+        List<String> permissions = rank.getPermissions();
+        if (permissions == null || permissions.isEmpty()) {
+            plugin.log("No permissions configured for this rank!");
+            return;
+        }
+
+        plugin.log("Testing " + permissions.size() + " permissions:");
+        for (String perm : permissions) {
+            if (perm != null && !perm.trim().isEmpty() && !perm.startsWith("-")) {
+                boolean hasIt = player.hasPermission(perm.trim());
+                plugin.log("  " + perm + " = " + hasIt + (hasIt ? " ✓" : " ✗"));
+            }
+        }
+
+        // Test wildcard
+        plugin.log("Wildcard (*): " + player.hasPermission("*"));
+
+        // Show effective permissions count
+        try {
+            int effectiveCount = player.getEffectivePermissions().size();
+            plugin.log("Total effective permissions: " + effectiveCount);
+        } catch (Exception e) {
+            plugin.log("Could not get effective permissions: " + e.getMessage());
+        }
+    }
+
+    /**
+     * NEW: Force refresh permissions for a player
+     */
+    public void refreshPlayerPermissions(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        plugin.log("Force refreshing permissions for " + player.getName());
+
+        UUID playerId = player.getUniqueId();
+        PlayerRankData playerData = playerRanks.get(playerId);
+
+        if (playerData != null) {
+            RankData rank = getRank(playerData.getRankName());
+            if (rank != null) {
+                // Force reapply permissions
+                applyPermissions(player, rank);
+            }
+        }
+    }
+
+    /**
+     * NEW: Get version info for debugging
+     */
+    public String getVersionInfo() {
+        return "MC Version: " + mcVersion +
+                " | Old: " + isOldMinecraft +
+                " | Very Old: " + isVeryOldMinecraft +
+                " | Players: " + playerRanks.size() +
+                " | Attachments: " + permissionAttachments.size();
     }
 }
